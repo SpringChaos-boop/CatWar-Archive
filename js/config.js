@@ -1,13 +1,13 @@
 // Заполните после создания проекта Supabase.
 // anon key предназначен для публичного клиента; секретный service_role key сюда добавлять нельзя.
 window.CATWAR_CONFIG = {
-  SUPABASE_URL: "ВСТАВЬТЕ_PROJECT_URL",
-  SUPABASE_ANON_KEY: "ВСТАВЬТЕ_ANON_PUBLIC_KEY",
+  SUPABASE_URL: "https://srfyrytrucbspxpphdua.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_m5souCbWl7ZYNh6fdNlxxA_ScvMYUUy",
   PROFILE_BASE_URL: "https://catwar.su/cat/"
 };
 window.catwarSupabase = null;
 if (window.CATWAR_CONFIG.SUPABASE_URL.startsWith("https://") &&
-    !window.CATWAR_CONFIG.SUPABASE_ANON_KEY.startsWith("ВСТАВЬТЕ")) {
+    !window.CATWAR_CONFIG.SUPABASE_ANON_KEY.startsWith("sb_publishable_m5souCbWl7ZYNh6fdNlxxA_ScvMYUUy")) {
   window.catwarSupabase = window.supabase.createClient(
     window.CATWAR_CONFIG.SUPABASE_URL,
     window.CATWAR_CONFIG.SUPABASE_ANON_KEY
