@@ -6,6 +6,7 @@
   let listMode = 'active';
   let auditMode = false;
   let factionRows = [], rankRows = [], galleryRows = [];
+  let validatedBackup = null;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const notify = (message, bad = false) => {
@@ -213,6 +214,124 @@
     }
   }
 
+
+  const backupParentFields = [
+    'id','game_id','last_name','birth_date','death_date','death_cause','biography',
+    'notes','profile_url','cover_url','deleted_at','created_at','updated_at'
+  ];
+  const backupChildFields = {
+    character_names: ['id','character_id','name','position'],
+    faction_periods: ['id','character_id','faction_name','start_date','end_date','position','created_at'],
+    rank_periods: ['id','character_id','rank_name','start_date','end_date','position','created_at'],
+    gallery_items: ['id','character_id','image_url','caption','position','created_at']
+  };
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  function pickFields(row, fields) {
+    const result = {};
+    for (const field of fields) if (Object.prototype.hasOwnProperty.call(row, field)) result[field] = row[field];
+    return result;
+  }
+
+  function validateBackupObject(data) {
+    if (!data || data.format !== 'catwar-archive-backup' || data.formatVersion !== 1 || !Array.isArray(data.characters)) {
+      throw new Error('Формат файла не распознан. Нужна резервная копия CatWar Archive версии 1.');
+    }
+    if (data.characters.length > 100000) throw new Error('В файле слишком много записей.');
+    const seen = new Set();
+    const normalized = data.characters.map((character, index) => {
+      if (!character || typeof character !== 'object' || !uuidPattern.test(character.id || '') || !String(character.last_name || '').trim()) {
+        throw new Error(`Некорректная карточка персонажа в строке ${index + 1}: отсутствует UUID или последнее имя.`);
+      }
+      if (seen.has(character.id)) throw new Error(`В резервной копии повторяется UUID персонажа ${character.id}.`);
+      seen.add(character.id);
+      const row = pickFields(character, backupParentFields);
+      for (const table of Object.keys(backupChildFields)) {
+        const values = character[table] ?? [];
+        if (!Array.isArray(values)) throw new Error(`Поле ${table} у персонажа «${character.last_name}» имеет неверный формат.`);
+        row[table] = values.map((item, childIndex) => {
+          if (!item || typeof item !== 'object') throw new Error(`Повреждена связанная запись ${table} у персонажа «${character.last_name}».`);
+          const child = pickFields(item, backupChildFields[table]);
+          if (child.character_id && child.character_id !== character.id) throw new Error(`Несовпадение character_id в ${table} у персонажа «${character.last_name}».`);
+          child.character_id = character.id;
+          if (child.id && !uuidPattern.test(child.id)) throw new Error(`Некорректный UUID в ${table} у персонажа «${character.last_name}».`);
+          return child;
+        });
+      }
+      return row;
+    });
+    return { ...data, characters: normalized };
+  }
+
+  async function validateBackupFile() {
+    const file = $('backup-file').files[0];
+    validatedBackup = null;
+    $('restore-backup').disabled = true;
+    if (!file) { $('backup-preview').textContent = 'Сначала выбери JSON-файл.'; return; }
+    if (file.size > 50 * 1024 * 1024) { $('backup-preview').textContent = 'Файл превышает допустимый размер 50 МБ.'; return; }
+    try {
+      const parsed = JSON.parse(await file.text());
+      const backup = validateBackupObject(parsed);
+      if (!(await isAdmin())) throw new Error('Недостаточно прав администратора.');
+      const ids = backup.characters.map(x => x.id);
+      let existing = 0;
+      const chunkSize = 200;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const { data, error } = await db().from('characters').select('id').in('id', ids.slice(i, i + chunkSize));
+        if (error) throw error;
+        existing += (data || []).length;
+      }
+      validatedBackup = backup;
+      const fresh = backup.characters.length - existing;
+      $('backup-preview').innerHTML = `<div class="backup-preview-card"><strong>Файл прошёл проверку</strong><span>Дата создания копии: ${esc(backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('ru-RU') : 'не указана')}</span><span>Персонажей в файле: ${backup.characters.length}</span><span>Будет добавлено: ${fresh}</span><span>Будет обновлено по совпадающему UUID: ${existing}</span><span>Исторических событий в файле: ${Number(backup.auditLog?.length || 0)} (они не импортируются повторно)</span></div>`;
+      $('restore-backup').disabled = backup.characters.length === 0;
+    } catch (error) {
+      $('backup-preview').textContent = `Проверка не пройдена: ${error.message}`;
+    }
+  }
+
+  async function restoreBackup() {
+    if (!validatedBackup || saving) return;
+    const backup = validatedBackup;
+    const confirmed = confirm(`Восстановить ${backup.characters.length} персонажей из резервной копии? Записи с совпадающими UUID будут перезаписаны данными из файла. Записи, которых нет в файле, останутся без изменений. Это действие нельзя автоматически отменить.`);
+    if (!confirmed) return;
+    saving = true;
+    const button = $('restore-backup');
+    button.disabled = true;
+    const original = button.textContent;
+    let completed = 0;
+    try {
+      if (!(await isAdmin())) throw new Error('Недостаточно прав администратора.');
+      for (const character of backup.characters) {
+        const parent = pickFields(character, backupParentFields);
+        const { error: parentError } = await db().from('characters').upsert(parent, { onConflict: 'id' });
+        if (parentError) throw new Error(`Персонаж «${character.last_name}»: ${parentError.message}`);
+        for (const table of Object.keys(backupChildFields)) {
+          const { error: deleteError } = await db().from(table).delete().eq('character_id', character.id);
+          if (deleteError) throw new Error(`Очистка ${table} у «${character.last_name}»: ${deleteError.message}`);
+          const rows = (character[table] || []).map(item => pickFields(item, backupChildFields[table]));
+          if (rows.length) {
+            const { error: insertError } = await db().from(table).insert(rows);
+            if (insertError) throw new Error(`Восстановление ${table} у «${character.last_name}»: ${insertError.message}`);
+          }
+        }
+        completed++;
+        button.textContent = `Восстановлено ${completed}/${backup.characters.length}…`;
+      }
+      $('backup-preview').innerHTML = `<div class="backup-preview-card"><strong>Восстановление завершено</strong><span>Обработано персонажей: ${completed}</span><span>Журнал сохранён без повторного импорта старых событий; восстановление будет отражено новыми событиями.</span></div>`;
+      validatedBackup = null;
+      $('backup-file').value = '';
+      await loadAdminList();
+      alert(`Восстановление завершено. Обработано персонажей: ${completed}.`);
+    } catch (error) {
+      $('backup-preview').textContent = `Восстановление остановлено после ${completed} персонажей. ${error.message} Можно повторно выбрать тот же файл: уже восстановленные записи будут обработаны заново.`;
+    } finally {
+      saving = false;
+      button.textContent = original;
+      button.disabled = !validatedBackup;
+    }
+  }
+
   const auditTableLabels = {
     characters: 'Карточка персонажа', character_names: 'История имён',
     faction_periods: 'История фракций', rank_periods: 'История должностей',
@@ -376,6 +495,11 @@
   $('logout').onclick = async () => { await db().auth.signOut(); location.reload(); };
   $('new-character').onclick = resetForm;
   $('export-backup').onclick = exportBackup;
+  $('import-backup-toggle').onclick = () => { $('backup-restore-panel').hidden = false; $('backup-restore-panel').scrollIntoView({ behavior: 'smooth' }); };
+  $('close-import').onclick = () => { $('backup-restore-panel').hidden = true; };
+  $('validate-backup').onclick = validateBackupFile;
+  $('backup-file').onchange = () => { validatedBackup = null; $('restore-backup').disabled = true; $('backup-preview').textContent = 'Нажми «Проверить файл», чтобы проверить структуру копии.'; };
+  $('restore-backup').onclick = restoreBackup;
   $('cancel-edit').onclick = () => { $('editor').hidden = true; };
   $('admin-search').oninput = loadAdminList;
   $('active-tab').onclick = () => { auditMode = false; listMode = 'active'; loadAdminList(); };
