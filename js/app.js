@@ -44,8 +44,8 @@
   }
 
   function populateFilters() {
-    const factions = [...new Set(all.map(c => latest(c.factions).faction_name).filter(Boolean))].sort();
-    const ranks = [...new Set(all.map(c => latest(c.ranks).rank_name).filter(Boolean))].sort();
+    const factions = [...new Set(all.flatMap(c => (c.factions || []).map(x => x.faction_name)).filter(Boolean))].sort();
+    const ranks = [...new Set(all.flatMap(c => (c.ranks || []).map(x => x.rank_name)).filter(Boolean))].sort();
     $('faction-filter').innerHTML = '<option value="">Все фракции</option>' + factions.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
     $('rank-filter').innerHTML = '<option value="">Все должности</option>' + ranks.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
     const years = [...new Set(all.map(c => c.death_date?.slice(0,4)).filter(Boolean))].sort().reverse();
@@ -63,17 +63,21 @@
     const query = $('search').value.trim().toLocaleLowerCase('ru');
     const faction = $('faction-filter').value, rank = $('rank-filter').value, year = $('year-filter').value;
     const sort = $('sort').value;
+    const imageFilter = $('image-filter').value;
     let rows = all.filter(c => {
       const names = (c.names || []).join(' ');
-      const searchable = [c.game_id || '', c.last_name || '', names].join(' ').toLocaleLowerCase('ru');
+      const searchable = [c.game_id || '', c.last_name || '', names, c.death_cause || '', c.biography || '', c.notes || ''].join(' ').toLocaleLowerCase('ru');
       return (!query || searchable.includes(query)) &&
         (!faction || latest(c.factions).faction_name === faction) &&
-        (!rank || latest(c.ranks).rank_name === rank) &&
-        (!year || (c.death_date || '').startsWith(year));
+        (!rank || (c.ranks || []).some(x => x.rank_name === rank)) &&
+        (!faction || (c.factions || []).some(x => x.faction_name === faction)) &&
+        (!year || (c.death_date || '').startsWith(year)) &&
+        (!imageFilter || (imageFilter === 'yes' ? !!(c.cover_url || (c.gallery_items || []).length) : !(c.cover_url || (c.gallery_items || []).length)));
     });
     rows.sort((a,b) => {
       if (sort === 'name_asc') return (a.last_name || '').localeCompare(b.last_name || '', 'ru');
       if (sort === 'id_asc') return String(a.game_id || '').localeCompare(String(b.game_id || ''), undefined, {numeric:true});
+      if (sort === 'birth_asc' || sort === 'birth_desc') { const x = a.birth_date || '9999', y = b.birth_date || '9999'; return sort === 'birth_asc' ? x.localeCompare(y) : y.localeCompare(x); }
       const x = a.death_date || '0000', y = b.death_date || '0000';
       return sort === 'death_asc' ? x.localeCompare(y) : y.localeCompare(x);
     });
@@ -128,9 +132,9 @@
     $('profile-dialog').showModal();
   }
 
-  ['search','faction-filter','rank-filter','year-filter','sort'].forEach(id => $(id).addEventListener('input', () => { shown = PAGE_SIZE; render(); }));
+  ['search','faction-filter','rank-filter','year-filter','sort','image-filter'].forEach(id => $(id).addEventListener('input', () => { shown = PAGE_SIZE; render(); }));
   $('reset').addEventListener('click', () => {
-    $('search').value = ''; $('faction-filter').value = ''; $('rank-filter').value = ''; $('year-filter').value = ''; $('sort').value = 'death_desc'; shown = PAGE_SIZE; render();
+    $('search').value = ''; $('faction-filter').value = ''; $('rank-filter').value = ''; $('year-filter').value = ''; $('image-filter').value = ''; $('sort').value = 'death_desc'; shown = PAGE_SIZE; render();
   });
   $('close-profile').addEventListener('click', () => $('profile-dialog').close());
   $('profile-dialog').addEventListener('click', event => { if (event.target.id === 'profile-dialog') $('profile-dialog').close(); });
