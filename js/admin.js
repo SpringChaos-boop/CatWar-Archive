@@ -7,6 +7,8 @@
   let auditMode = false;
   let factionRows = [], rankRows = [], galleryRows = [];
   let validatedBackup = null;
+  let authCheckId = 0;
+  let imageRows = [];
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const notify = (message, bad = false) => {
@@ -23,10 +25,29 @@
     return !error && !!data;
   }
 
-  async function refreshAccess() {
+  async function refreshAccess(session = undefined) {
     if (!configured()) return;
-    const { data: { user } } = await db().auth.getUser();
-    const allowed = !!user && await isAdmin();
+    const checkId = ++authCheckId;
+    const alreadyVisible = !$('dashboard').hidden;
+    if (!alreadyVisible) {
+      $('auth-loading').hidden = false;
+      $('login-panel').hidden = true;
+      $('dashboard').hidden = true;
+    }
+    let user = session === undefined ? null : session?.user || null;
+    if (session === undefined) {
+      const { data, error } = await db().auth.getSession();
+      if (error) throw error;
+      user = data.session?.user || null;
+    }
+    let allowed = false;
+    if (user) {
+      const { data, error } = await db().from('archive_admins').select('user_id').eq('user_id', user.id).maybeSingle();
+      if (error) throw error;
+      allowed = !!data;
+    }
+    if (checkId !== authCheckId) return;
+    $('auth-loading').hidden = true;
     $('login-panel').hidden = allowed;
     $('dashboard').hidden = !allowed;
     if (allowed) await loadAdminList();
@@ -34,8 +55,8 @@
   }
 
   async function loadAdminList() {
-    if (auditMode) { await loadAuditLog(); return; }
-    $('audit-panel').hidden = true;
+    if (auditMode) { $('admin-list').hidden = true; $('audit-panel').hidden = true; $('images-panel').hidden = true; await loadAuditLog(); return; }
+    $('audit-panel').hidden = true; $('images-panel').hidden = true;
     $('admin-list').hidden = false;
     const { data, error } = await db().from('characters')
       .select('id,game_id,last_name,deleted_at').order('last_name').limit(1000);
@@ -56,8 +77,8 @@
     $('trash-tab').classList.toggle('active', listMode === 'trash');
     $('active-tab').setAttribute('aria-selected', String(listMode === 'active'));
     $('trash-tab').setAttribute('aria-selected', String(listMode === 'trash'));
-    $('log-tab').classList.remove('active');
-    $('log-tab').setAttribute('aria-selected', 'false');
+    $('log-tab').classList.remove('active'); $('images-tab').classList.remove('active');
+    $('log-tab').setAttribute('aria-selected', 'false'); $('images-tab').setAttribute('aria-selected', 'false');
     $('new-character').hidden = listMode === 'trash';
     $('admin-list').innerHTML = rows.map(c => listMode === 'active' ? `
       <div class="admin-item">
@@ -89,6 +110,57 @@
     document.querySelectorAll('[data-permanent-delete]').forEach(button => {
       button.onclick = () => permanentlyDeleteCharacter(button.dataset.permanentDelete);
     });
+  }
+
+  async function loadImageManager() {
+    $('admin-list').hidden = true; $('audit-panel').hidden = true; $('images-panel').hidden = false;
+    $('active-tab').classList.remove('active'); $('trash-tab').classList.remove('active'); $('log-tab').classList.remove('active'); $('images-tab').classList.add('active');
+    ['active-tab','trash-tab','log-tab'].forEach(id => $(id).setAttribute('aria-selected','false'));
+    $('images-tab').setAttribute('aria-selected','true');
+    $('new-character').hidden = true;
+    $('list-message').textContent = '';
+    try {
+      const characters = await fetchAllRows('characters','id,last_name,cover_url,deleted_at,gallery_items(id,image_url,caption,position)','created_at');
+      imageRows = [];
+      for (const c of characters) {
+        if (c.cover_url) imageRows.push({kind:'cover',character_id:c.id,character_name:c.last_name,url:c.cover_url,caption:'Основное изображение',deleted:!!c.deleted_at});
+        for (const g of c.gallery_items || []) if (g.image_url) imageRows.push({kind:'gallery',character_id:c.id,character_name:c.last_name,url:g.image_url,caption:g.caption || 'Без подписи',item_id:g.id,deleted:!!c.deleted_at});
+      }
+      renderImageManager();
+    } catch (error) { $('image-manager-list').textContent = `Не удалось загрузить изображения: ${error.message}`; }
+  }
+
+  function renderImageManager() {
+    const q = $('image-search').value.trim().toLocaleLowerCase('ru');
+    const kind = $('image-kind').value;
+    const rows = imageRows.filter(x => (kind === 'all' || x.kind === kind) && `${x.character_name} ${x.caption}`.toLocaleLowerCase('ru').includes(q));
+    $('image-manager-list').innerHTML = rows.map((x,i) => `<article class="managed-image"><img src="${esc(x.url)}" alt="" loading="lazy"><div class="managed-image-info"><strong>${esc(x.character_name)}</strong><span>${x.kind === 'cover' ? 'Основное изображение' : 'Галерея'} · ${esc(x.caption)}</span><small>${x.deleted ? 'Персонаж находится в корзине' : 'Активная запись'}</small><a href="${esc(x.url)}" target="_blank" rel="noopener">Открыть оригинал ↗</a></div><button class="button danger small" type="button" data-remove-image="${i}">Убрать</button></article>`).join('') || '<p class="muted">Изображения не найдены.</p>';
+    $('image-manager-list').querySelectorAll('[data-remove-image]').forEach(button => button.onclick = () => removeManagedImage(rows[Number(button.dataset.removeImage)]));
+  }
+
+  async function removeManagedImage(item) {
+    if (!item || !confirm(`Убрать изображение «${item.caption}» из карточки персонажа «${item.character_name}»?`)) return;
+    let result;
+    if (item.kind === 'cover') result = await db().from('characters').update({cover_url:null}).eq('id',item.character_id);
+    else result = await db().from('gallery_items').delete().eq('id',item.item_id);
+    if (result.error) { alert(`Не удалось убрать изображение: ${result.error.message}`); return; }
+    const path = storagePathFromPublicUrl(item.url);
+    let warning = '';
+    if (path) {
+      // Один URL может использоваться несколькими карточками. Удаляем объект из Storage
+      // только если после снятия текущей ссылки он больше нигде не используется.
+      const [{data: coverRefs,error: coverErr},{data: galleryRefs,error: galleryErr}] = await Promise.all([
+        db().from('characters').select('id').eq('cover_url', item.url).limit(1),
+        db().from('gallery_items').select('id').eq('image_url', item.url).limit(1)
+      ]);
+      if (coverErr || galleryErr) warning = ' Изображение убрано из карточки, но проверка повторного использования файла не удалась; объект в хранилище оставлен.';
+      else if (!(coverRefs || []).length && !(galleryRefs || []).length) {
+        const {error} = await db().storage.from('character-images').remove([path]);
+        if (error) warning = ` Изображение убрано из карточки, но файл в хранилище удалить не удалось: ${error.message}`;
+      }
+    }
+    await loadImageManager();
+    if (warning) alert(warning);
   }
 
   async function moveToTrash(id) {
@@ -488,9 +560,9 @@
     event.preventDefault();
     if (!configured()) { $('login-message').textContent = 'Сначала настройте Supabase в js/config.js.'; return; }
     $('login-message').textContent = 'Выполняется вход…';
-    const { error } = await db().auth.signInWithPassword({ email: $('email').value, password: $('password').value });
+    const { data, error } = await db().auth.signInWithPassword({ email: $('email').value, password: $('password').value });
     if (error) { $('login-message').textContent = error.message; return; }
-    await refreshAccess();
+    await refreshAccess(data.session);
   };
   $('logout').onclick = async () => { await db().auth.signOut(); location.reload(); };
   $('new-character').onclick = resetForm;
@@ -505,6 +577,10 @@
   $('active-tab').onclick = () => { auditMode = false; listMode = 'active'; loadAdminList(); };
   $('trash-tab').onclick = () => { auditMode = false; listMode = 'trash'; loadAdminList(); };
   $('log-tab').onclick = () => { auditMode = true; loadAdminList(); };
+  $('images-tab').onclick = () => { auditMode = false; loadImageManager(); };
+  $('refresh-images').onclick = loadImageManager;
+  $('image-search').oninput = renderImageManager;
+  $('image-kind').onchange = renderImageManager;
   $('refresh-audit').onclick = loadAuditLog;
   $('add-faction').onclick = () => { factionRows.push({ faction_name: '', start_date: null, end_date: null }); renderPeriods('faction', factionRows); };
   $('add-rank').onclick = () => { rankRows.push({ rank_name: '', start_date: null, end_date: null }); renderPeriods('rank', rankRows); };
@@ -608,8 +684,13 @@
   };
 
   if (configured()) {
-    db().auth.onAuthStateChange(() => refreshAccess());
-    refreshAccess().catch(error => $('login-message').textContent = error.message);
+    db().auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        // Не выполняем запросы Supabase внутри auth callback: это предотвращает блокировки и мигание формы входа.
+        setTimeout(() => refreshAccess(session).catch(error => { $('auth-loading').hidden = true; $('login-panel').hidden = false; $('login-message').textContent = error.message; }), 0);
+      }
+    });
+    refreshAccess().catch(error => { $('auth-loading').hidden = true; $('login-panel').hidden = false; $('login-message').textContent = error.message; });
   } else {
     $('login-message').textContent = 'Подключите Supabase: заполните js/config.js и выполните SQL из supabase/schema.sql.';
   }
