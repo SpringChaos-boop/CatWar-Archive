@@ -2,6 +2,7 @@
   const $ = id => document.getElementById(id);
   const db = () => window.catwarSupabase;
   let editing = null;
+  let saving = false;
   let factionRows = [], rankRows = [], galleryRows = [];
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -167,7 +168,15 @@
 
   $('character-form').onsubmit = async event => {
     event.preventDefault();
+    if (saving) return;
+
+    saving = true;
+    const submitButton = $('character-form').querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Сохранение…';
     notify('Сохранение…');
+
     try {
       if (!(await isAdmin())) throw new Error('Недостаточно прав.');
       const game_id = $('game-id').value.trim() || null;
@@ -180,7 +189,12 @@
 
       let cover_url = $('cover-url').value.trim() || null;
       const coverFile = $('cover-file').files[0];
-      if (coverFile) cover_url = await uploadFile(coverFile, 'covers');
+      if (coverFile) {
+        cover_url = await uploadFile(coverFile, 'covers');
+        // Сохраняем полученную ссылку в форме: повторная попытка не загрузит файл заново.
+        $('cover-url').value = cover_url;
+        $('cover-file').value = '';
+      }
 
       const payload = {
         game_id, last_name,
@@ -192,14 +206,22 @@
         profile_url: $('profile-url').value.trim() || null,
         cover_url
       };
-      let characterId = editing;
-      if (editing) {
-        const { error } = await db().from('characters').update(payload).eq('id', editing);
+
+      // Если предыдущая попытка уже создала основную запись, editing содержит её ID.
+      // Повторное сохранение обновит эту запись вместо создания дубля.
+      let characterId = editing || $('character-id').value || null;
+      if (characterId) {
+        const { error } = await db().from('characters').update(payload).eq('id', characterId);
         if (error) throw error;
       } else {
         const { data, error } = await db().from('characters').insert(payload).select('id').single();
         if (error) throw error;
         characterId = data.id;
+
+        // Фиксируем ID немедленно, до сохранения дочерних таблиц.
+        editing = characterId;
+        $('character-id').value = characterId;
+        $('editor-heading').textContent = 'Редактирование записи';
       }
 
       await replaceChildren('character_names', characterId, names.map((name, position) => ({ name, position })));
@@ -213,14 +235,31 @@
       const galleryToSave = [];
       for (const [position, item] of galleryRows.entries()) {
         let image_url = (item.image_url || '').trim();
-        if (item.file) image_url = await uploadFile(item.file, 'gallery');
+        if (item.file) {
+          image_url = await uploadFile(item.file, 'gallery');
+          // Не загружаем тот же файл повторно, если сохранение таблицы завершится ошибкой.
+          item.image_url = image_url;
+          item.file = null;
+        }
         if (image_url) galleryToSave.push({ image_url, caption: (item.caption || '').trim() || null, position });
       }
       await replaceChildren('gallery_items', characterId, galleryToSave);
+
+      editing = characterId;
+      $('character-id').value = characterId;
+      $('editor-heading').textContent = 'Редактирование записи';
       notify('Запись сохранена.');
       await loadAdminList();
     } catch (error) {
-      notify(error.message || 'Не удалось сохранить запись.', true);
+      notify(
+        (error.message || 'Не удалось сохранить запись.') +
+        (editing ? ' Запись персонажа уже создана или существует. Исправь проблему и нажми «Сохранить запись» ещё раз — повторная попытка обновит её, а не создаст новую.' : ''),
+        true
+      );
+    } finally {
+      saving = false;
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
     }
   };
 
