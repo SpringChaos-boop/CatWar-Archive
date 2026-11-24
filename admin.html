@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Управление архивом — CatWar Archive</title>
-  <link rel="stylesheet" href="css/style.css?v=5">
+  <link rel="stylesheet" href="css/style.css?v=6">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="js/config.js?v=5"></script>
-  <script defer src="js/admin.js?v=5"></script>
+  <script defer src="js/config.js?v=6"></script>
+  <script defer src="js/admin.js?v=6"></script>
 </head>
 <body>
   <header class="site-header">
@@ -32,9 +32,11 @@
       <div class="admin-tabs" role="tablist" aria-label="Разделы записей">
         <button id="active-tab" class="admin-tab active" type="button" role="tab" aria-selected="true">Активные записи <span id="active-count">0</span></button>
         <button id="trash-tab" class="admin-tab" type="button" role="tab" aria-selected="false">Корзина <span id="trash-count">0</span></button>
+        <button id="log-tab" class="admin-tab" type="button" role="tab" aria-selected="false">Журнал изменений</button>
       </div>
       <p id="list-message" class="form-message" role="status"></p>
       <div id="admin-list" class="admin-list"></div>
+      <section id="audit-panel" class="audit-panel" hidden><div class="audit-heading"><h2>Журнал изменений</h2><button id="refresh-audit" class="button secondary small" type="button">Обновить</button></div><p class="muted">Последние 200 действий с записями архива.</p><div id="audit-list" class="audit-list"></div></section>
 
       <section id="editor" class="panel editor" hidden>
         <div class="editor-title"><div><p class="eyebrow">КАРТОЧКА ПЕРСОНАЖА</p><h2 id="editor-heading">Новая запись</h2></div><button id="cancel-edit" class="text-button">Закрыть</button></div>
