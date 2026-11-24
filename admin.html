@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Управление архивом — CatWar Archive</title>
-  <link rel="stylesheet" href="css/style.css?v=9">
+  <link rel="stylesheet" href="css/style.css?v=11">
+  <script>
+    (() => { try { const saved = localStorage.getItem('catwar-archive-theme'); if (saved === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (_) {} })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="js/config.js?v=9"></script>
   <script defer src="js/admin.js?v=9"></script>
@@ -12,7 +15,7 @@
 <body>
   <header class="site-header">
     <a class="brand" href="./"><span class="brand-mark">✦</span><span>CATWAR <b>ARCHIVE</b><small>Управление архивом</small></span></a>
-    <nav><a href="./">Открыть каталог</a></nav>
+    <nav><a href="./">Открыть каталог</a><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Включить тёмную тему">Тёмная тема</button></nav>
   </header>
   <main class="container admin-container">
     <section id="auth-loading" class="panel login-panel"><p class="muted">Проверяем доступ к панели управления…</p></section>
@@ -77,5 +80,24 @@
     </section>
   </main>
   <script type="text/template" id="period-template"></script>
+  <script>
+    (() => {
+      const button = document.getElementById('theme-toggle');
+      if (!button) return;
+      const update = () => {
+        const dark = document.documentElement.dataset.theme === 'dark';
+        button.textContent = dark ? 'Светлая тема' : 'Тёмная тема';
+        button.setAttribute('aria-label', dark ? 'Включить светлую тему' : 'Включить тёмную тему');
+      };
+      button.addEventListener('click', () => {
+        const dark = document.documentElement.dataset.theme !== 'dark';
+        if (dark) document.documentElement.dataset.theme = 'dark';
+        else delete document.documentElement.dataset.theme;
+        try { localStorage.setItem('catwar-archive-theme', dark ? 'dark' : 'light'); } catch (_) {}
+        update();
+      });
+      update();
+    })();
+  </script>
 </body>
 </html>
