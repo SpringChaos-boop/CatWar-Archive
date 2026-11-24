@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Цифровой архив персонажей CatWar">
+  <title>CatWar Archive — архив персонажей</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="js/config.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./"><span class="brand-mark">✦</span><span>CATWAR <b>ARCHIVE</b><small>Цифровая летопись персонажей</small></span></a>
+    <nav><a class="active" href="./">Каталог</a><a href="#timeline">Хронология</a><a class="admin-link" href="admin.html">Вход администратора</a></nav>
+  </header>
+
+  <main class="container">
+    <section class="intro">
+      <p class="eyebrow">ОТКРЫТЫЙ АРХИВ</p>
+      <h1>Архив персонажей</h1>
+      <p class="lead">Истории, имена и судьбы персонажей CatWar.</p>
+      <div class="stats">
+        <div><strong id="stat-total">—</strong><span>персонажей</span></div>
+        <div><strong id="stat-factions">—</strong><span>фракций</span></div>
+        <div><strong id="stat-years">—</strong><span>лет в архиве</span></div>
+      </div>
+    </section>
+
+    <section class="catalog-tools" aria-label="Поиск и фильтры">
+      <label class="search"><span>⌕</span><input id="search" type="search" placeholder="Имя, прежнее имя или игровой ID"></label>
+      <div class="filters">
+        <select id="faction-filter"><option value="">Все фракции</option></select>
+        <select id="rank-filter"><option value="">Все ранги</option></select>
+        <select id="year-filter"><option value="">Любой год смерти</option></select>
+        <select id="sort">
+          <option value="death_desc">Сначала умершие позже</option>
+          <option value="death_asc">Сначала умершие раньше</option>
+          <option value="name_asc">По имени: А—Я</option>
+          <option value="id_asc">По ID</option>
+        </select>
+      </div>
+      <div class="results-line"><span id="result-count">Загрузка архива…</span><button id="reset" class="text-button">Сбросить фильтры</button></div>
+    </section>
+
+    <section id="character-list" class="character-list" aria-live="polite">
+      <div class="empty-state">Загружаем записи архива…</div>
+    </section>
+    <div class="pagination"><button id="load-more" class="button secondary" hidden>Показать ещё</button></div>
+
+    <section id="timeline" class="timeline-note">
+      <div><p class="eyebrow">ИСТОРИЯ</p><h2>Хронология архива</h2><p>Используй фильтр по году смерти, чтобы просматривать записи за выбранный период.</p></div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><span>CATWAR ARCHIVE</span><span>Цифровая летопись персонажей</span></footer>
+
+  <dialog id="profile-dialog" class="profile-dialog">
+    <button class="dialog-close" id="close-profile" aria-label="Закрыть">×</button>
+    <div id="profile-content"></div>
+  </dialog>
+</body>
+</html>

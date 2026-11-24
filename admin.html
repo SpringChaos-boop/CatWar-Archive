@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Управление архивом — CatWar Archive</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="js/config.js"></script>
+  <script defer src="js/admin.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./"><span class="brand-mark">✦</span><span>CATWAR <b>ARCHIVE</b><small>Управление архивом</small></span></a>
+    <nav><a href="./">Открыть каталог</a></nav>
+  </header>
+  <main class="container admin-container">
+    <section id="login-panel" class="panel login-panel">
+      <p class="eyebrow">ЗАКРЫТЫЙ РАЗДЕЛ</p><h1>Вход администратора</h1>
+      <p class="muted">Войти сможет только учётная запись, которой выданы права владельца архива.</p>
+      <form id="login-form" class="form-stack">
+        <label>Email<input id="email" type="email" autocomplete="username" required></label>
+        <label>Пароль<input id="password" type="password" autocomplete="current-password" required></label>
+        <button class="button" type="submit">Войти</button>
+      </form>
+      <p id="login-message" class="form-message" role="status"></p>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="admin-heading"><div><p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p><h1>Архив персонажей</h1><p class="muted">Добавление и редактирование записей.</p></div><button id="logout" class="button secondary">Выйти</button></div>
+      <div class="admin-actions"><button id="new-character" class="button">＋ Новая запись</button><input id="admin-search" type="search" placeholder="Найти по имени или игровому ID"></div>
+      <div id="admin-list" class="admin-list"></div>
+
+      <section id="editor" class="panel editor" hidden>
+        <div class="editor-title"><div><p class="eyebrow">КАРТОЧКА ПЕРСОНАЖА</p><h2 id="editor-heading">Новая запись</h2></div><button id="cancel-edit" class="text-button">Закрыть</button></div>
+        <form id="character-form" class="form-stack">
+          <input id="character-id" type="hidden">
+          <div class="form-grid">
+            <label>Игровой ID <span class="hint">Необязательный; может совпадать у разных персонажей</span><input id="game-id" inputmode="numeric"></label>
+            <label>Последнее имя<input id="last-name" required></label>
+          </div>
+          <label>История имён <span class="hint">По одному имени на строку, от первого к последнему</span><textarea id="names" rows="4" placeholder="Имя при рождении&#10;Следующее имя&#10;Последнее имя"></textarea></label>
+          <div class="form-grid">
+            <label>Дата рождения<input id="birth-date" type="date"></label>
+            <label>Дата смерти<input id="death-date" type="date"></label>
+          </div>
+          <label>Ссылка на игровой профиль<input id="profile-url" type="url" placeholder="https://catwar.su/cat..."></label>
+          <label>Основное изображение: файл<input id="cover-file" type="file" accept="image/*"></label>
+          <label>Или ссылка на основное изображение<input id="cover-url" type="url" placeholder="https://..."></label>
+          <div class="subsection"><div class="subsection-heading"><h3>История фракций</h3><button type="button" id="add-faction" class="button small secondary">＋ Период</button></div><p class="hint">Добавляй периоды от самого раннего к последнему. Порядок строк сохраняется; даты можно оставить пустыми, если они неизвестны.</p><div id="faction-periods"></div></div>
+          <div class="subsection"><div class="subsection-heading"><h3>История должностей</h3><button type="button" id="add-rank" class="button small secondary">＋ Период</button></div><p class="hint">Добавляй периоды от самого раннего к последнему. Неизвестные даты можно оставить пустыми.</p><div id="rank-periods"></div></div>
+          <label>Причина смерти<input id="death-cause" placeholder="Например, отравление"></label>
+          <label>Биография <span class="hint">Краткая история жизни персонажа</span><textarea id="biography" rows="4" placeholder="Происхождение, важные события жизни, особенности характера..."></textarea></label>
+          <label>Обстоятельства и заметки<textarea id="notes" rows="4"></textarea></label>
+          <div class="subsection"><div class="subsection-heading"><h3>Галерея</h3><button type="button" id="add-gallery" class="button small secondary">＋ Изображение</button></div><div id="gallery-items"></div></div>
+          <div class="form-footer"><span id="save-message" class="form-message" role="status"></span><button type="submit" class="button">Сохранить запись</button></div>
+        </form>
+      </section>
+    </section>
+  </main>
+  <script type="text/template" id="period-template"></script>
+</body>
+</html>
