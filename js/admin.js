@@ -151,6 +151,68 @@
     alert(`Персонаж «${data.last_name}» удалён окончательно.${storageWarning}`);
   }
 
+
+  async function fetchAllRows(table, select, orderColumn = 'created_at') {
+    const pageSize = 500;
+    const result = [];
+    for (let from = 0; ; from += pageSize) {
+      let query = db().from(table).select(select);
+      if (orderColumn) query = query.order(orderColumn, { ascending: true });
+      const { data, error } = await query.range(from, from + pageSize - 1);
+      if (error) throw new Error(`Не удалось выгрузить ${table}: ${error.message}`);
+      const batch = data || [];
+      result.push(...batch);
+      if (batch.length < pageSize) break;
+    }
+    return result;
+  }
+
+  async function exportBackup() {
+    const button = $('export-backup');
+    if (button.disabled) return;
+    button.disabled = true;
+    const oldText = button.textContent;
+    button.textContent = 'Подготовка копии…';
+    try {
+      if (!(await isAdmin())) throw new Error('Недостаточно прав для создания резервной копии.');
+      const characters = await fetchAllRows(
+        'characters',
+        '*,character_names(*),faction_periods(*),rank_periods(*),gallery_items(*)',
+        'created_at'
+      );
+      const auditLog = await fetchAllRows(
+        'archive_audit_log',
+        'id,created_at,actor_id,action,table_name,character_id,character_name,changes',
+        'created_at'
+      );
+      const backup = {
+        format: 'catwar-archive-backup',
+        formatVersion: 1,
+        exportedAt: new Date().toISOString(),
+        note: 'Резервная копия данных и ссылок на изображения. Сами файлы изображений находятся отдельно в Supabase Storage.',
+        counts: { characters: characters.length, auditLog: auditLog.length },
+        characters,
+        auditLog
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      link.href = url;
+      link.download = `catwar-archive-backup-${stamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      alert(`Резервная копия подготовлена. Персонажей: ${characters.length}; событий журнала: ${auditLog.length}.\n\nХрани файл в надёжном месте. Изображения сохранены в копии как ссылки, а не как файлы.`);
+    } catch (error) {
+      alert(`Не удалось создать резервную копию: ${error.message}`);
+    } finally {
+      button.disabled = false;
+      button.textContent = oldText;
+    }
+  }
+
   const auditTableLabels = {
     characters: 'Карточка персонажа', character_names: 'История имён',
     faction_periods: 'История фракций', rank_periods: 'История должностей',
@@ -313,6 +375,7 @@
   };
   $('logout').onclick = async () => { await db().auth.signOut(); location.reload(); };
   $('new-character').onclick = resetForm;
+  $('export-backup').onclick = exportBackup;
   $('cancel-edit').onclick = () => { $('editor').hidden = true; };
   $('admin-search').oninput = loadAdminList;
   $('active-tab').onclick = () => { auditMode = false; listMode = 'active'; loadAdminList(); };
