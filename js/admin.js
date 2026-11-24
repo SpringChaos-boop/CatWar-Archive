@@ -3,6 +3,7 @@
   const db = () => window.catwarSupabase;
   let editing = null;
   let saving = false;
+  let listMode = 'active';
   let factionRows = [], rankRows = [], galleryRows = [];
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -34,17 +35,114 @@
     const { data, error } = await db().from('characters')
       .select('id,game_id,last_name,deleted_at').order('last_name').limit(1000);
     if (error) { $('admin-list').textContent = error.message; return; }
+
+    const allRows = data || [];
+    const activeRows = allRows.filter(c => !c.deleted_at);
+    const trashRows = allRows.filter(c => !!c.deleted_at);
+    $('active-count').textContent = activeRows.length;
+    $('trash-count').textContent = trashRows.length;
+
     const query = $('admin-search').value.trim().toLocaleLowerCase('ru');
-    const rows = (data || []).filter(c => !c.deleted_at &&
+    const source = listMode === 'trash' ? trashRows : activeRows;
+    const rows = source.filter(c =>
       (`${c.last_name} ${c.game_id || ''}`).toLocaleLowerCase('ru').includes(query));
-    $('admin-list').innerHTML = rows.map(c => `
+
+    $('active-tab').classList.toggle('active', listMode === 'active');
+    $('trash-tab').classList.toggle('active', listMode === 'trash');
+    $('active-tab').setAttribute('aria-selected', String(listMode === 'active'));
+    $('trash-tab').setAttribute('aria-selected', String(listMode === 'trash'));
+    $('new-character').hidden = listMode === 'trash';
+    $('admin-list').innerHTML = rows.map(c => listMode === 'active' ? `
       <div class="admin-item">
         <div><strong>${esc(c.last_name)}</strong><small>Игровой ID: ${esc(c.game_id || 'не указан')}</small></div>
-        <button class="button secondary" data-edit="${esc(c.id)}">Редактировать</button>
-      </div>`).join('') || '<p class="muted">Записей пока нет.</p>';
+        <div class="admin-item-actions">
+          <button class="button secondary" data-edit="${esc(c.id)}">Редактировать</button>
+          <button class="button danger" data-trash="${esc(c.id)}">В корзину</button>
+        </div>
+      </div>` : `
+      <div class="admin-item">
+        <div><strong>${esc(c.last_name)}</strong><small>Удалён: ${esc(new Date(c.deleted_at).toLocaleString('ru-RU'))} · Игровой ID: ${esc(c.game_id || 'не указан')}</small></div>
+        <div class="admin-item-actions">
+          <button class="button secondary" data-restore="${esc(c.id)}">Восстановить</button>
+          <button class="button danger" data-permanent-delete="${esc(c.id)}">Удалить навсегда</button>
+        </div>
+      </div>`).join('') || (listMode === 'trash'
+        ? '<p class="muted">Корзина пуста.</p>'
+        : '<p class="muted">Активных записей не найдено.</p>');
+
     document.querySelectorAll('[data-edit]').forEach(button => {
       button.onclick = () => editCharacter(button.dataset.edit);
     });
+    document.querySelectorAll('[data-trash]').forEach(button => {
+      button.onclick = () => moveToTrash(button.dataset.trash);
+    });
+    document.querySelectorAll('[data-restore]').forEach(button => {
+      button.onclick = () => restoreCharacter(button.dataset.restore);
+    });
+    document.querySelectorAll('[data-permanent-delete]').forEach(button => {
+      button.onclick = () => permanentlyDeleteCharacter(button.dataset.permanentDelete);
+    });
+  }
+
+  async function moveToTrash(id) {
+    const row = await getCharacterForTrashAction(id);
+    if (!row) return;
+    if (!confirm(`Переместить персонажа «${row.last_name}» в корзину? Его карточка и связанные данные сохранятся, а из публичного каталога он исчезнет.`)) return;
+    const { error } = await db().from('characters').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+    if (error) { alert(`Не удалось переместить запись в корзину: ${error.message}`); return; }
+    if ($('character-id').value === id) $('editor').hidden = true;
+    await loadAdminList();
+  }
+
+  async function restoreCharacter(id) {
+    const row = await getCharacterForTrashAction(id);
+    if (!row) return;
+    if (!confirm(`Восстановить персонажа «${row.last_name}»? Он снова появится в публичном каталоге.`)) return;
+    const { error } = await db().from('characters').update({ deleted_at: null }).eq('id', id);
+    if (error) { alert(`Не удалось восстановить запись: ${error.message}`); return; }
+    await loadAdminList();
+  }
+
+  async function getCharacterForTrashAction(id) {
+    const { data, error } = await db().from('characters').select('id,last_name,deleted_at').eq('id', id).single();
+    if (error) { alert(`Не удалось получить запись: ${error.message}`); return null; }
+    return data;
+  }
+
+  function storagePathFromPublicUrl(url) {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      const marker = '/storage/v1/object/public/character-images/';
+      const index = parsed.pathname.indexOf(marker);
+      if (index < 0) return null;
+      return decodeURIComponent(parsed.pathname.slice(index + marker.length));
+    } catch (_) { return null; }
+  }
+
+  async function permanentlyDeleteCharacter(id) {
+    const { data, error } = await db().from('characters')
+      .select('id,last_name,cover_url,gallery_items(image_url)').eq('id', id).single();
+    if (error) { alert(`Не удалось получить запись: ${error.message}`); return; }
+    const confirmed = confirm(`Удалить персонажа «${data.last_name}» НАВСЕГДА? Его карточка, история имён, фракций и должностей, а также галерея будут удалены без возможности восстановления.`);
+    if (!confirmed) return;
+
+    const imagePaths = [data.cover_url, ...(data.gallery_items || []).map(item => item.image_url)]
+      .map(storagePathFromPublicUrl).filter(Boolean);
+    const uniquePaths = [...new Set(imagePaths)];
+
+    const { error: deleteError } = await db().from('characters').delete().eq('id', id);
+    if (deleteError) { alert(`Не удалось удалить запись: ${deleteError.message}`); return; }
+
+    let storageWarning = '';
+    if (uniquePaths.length) {
+      const { error: storageError } = await db().storage.from('character-images').remove(uniquePaths);
+      if (storageError) storageWarning = `
+
+Запись удалена из базы, но не все файлы изображений удалось удалить из хранилища: ${storageError.message}`;
+    }
+    await loadAdminList();
+    alert(`Персонаж «${data.last_name}» удалён окончательно.${storageWarning}`);
   }
 
   function renderPeriods(kind, rows) {
@@ -162,6 +260,8 @@
   $('new-character').onclick = resetForm;
   $('cancel-edit').onclick = () => { $('editor').hidden = true; };
   $('admin-search').oninput = loadAdminList;
+  $('active-tab').onclick = () => { listMode = 'active'; loadAdminList(); };
+  $('trash-tab').onclick = () => { listMode = 'trash'; loadAdminList(); };
   $('add-faction').onclick = () => { factionRows.push({ faction_name: '', start_date: null, end_date: null }); renderPeriods('faction', factionRows); };
   $('add-rank').onclick = () => { rankRows.push({ rank_name: '', start_date: null, end_date: null }); renderPeriods('rank', rankRows); };
   $('add-gallery').onclick = () => { galleryRows.push({ image_url: '', caption: '' }); renderGallery(); };
