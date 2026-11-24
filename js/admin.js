@@ -4,6 +4,7 @@
   let editing = null;
   let saving = false;
   let listMode = 'active';
+  let auditMode = false;
   let factionRows = [], rankRows = [], galleryRows = [];
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -32,6 +33,9 @@
   }
 
   async function loadAdminList() {
+    if (auditMode) { await loadAuditLog(); return; }
+    $('audit-panel').hidden = true;
+    $('admin-list').hidden = false;
     const { data, error } = await db().from('characters')
       .select('id,game_id,last_name,deleted_at').order('last_name').limit(1000);
     if (error) { $('admin-list').textContent = error.message; return; }
@@ -51,6 +55,8 @@
     $('trash-tab').classList.toggle('active', listMode === 'trash');
     $('active-tab').setAttribute('aria-selected', String(listMode === 'active'));
     $('trash-tab').setAttribute('aria-selected', String(listMode === 'trash'));
+    $('log-tab').classList.remove('active');
+    $('log-tab').setAttribute('aria-selected', 'false');
     $('new-character').hidden = listMode === 'trash';
     $('admin-list').innerHTML = rows.map(c => listMode === 'active' ? `
       <div class="admin-item">
@@ -143,6 +149,55 @@
     }
     await loadAdminList();
     alert(`Персонаж «${data.last_name}» удалён окончательно.${storageWarning}`);
+  }
+
+  const auditTableLabels = {
+    characters: 'Карточка персонажа', character_names: 'История имён',
+    faction_periods: 'История фракций', rank_periods: 'История должностей',
+    gallery_items: 'Галерея'
+  };
+  const auditFieldLabels = {
+    game_id: 'Игровой ID', last_name: 'Последнее имя', birth_date: 'Дата рождения',
+    death_date: 'Дата смерти', death_cause: 'Причина смерти', biography: 'Биография',
+    notes: 'Заметки', profile_url: 'Ссылка на профиль', cover_url: 'Основное изображение',
+    deleted_at: 'Статус в архиве', name: 'Имя', faction_name: 'Фракция', rank_name: 'Должность',
+    start_date: 'Дата начала', end_date: 'Дата окончания', image_url: 'Изображение',
+    caption: 'Подпись', position: 'Порядок'
+  };
+  const auditActionLabels = { INSERT: 'Создание', UPDATE: 'Изменение', DELETE: 'Окончательное удаление' };
+  function auditValue(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    if (typeof value === 'object') return JSON.stringify(value);
+    if (String(value).includes('/storage/v1/object/')) return 'Изображение обновлено';
+    return String(value);
+  }
+  async function loadAuditLog() {
+    $('admin-list').hidden = true;
+    $('audit-panel').hidden = false;
+    $('new-character').hidden = true;
+    $('log-tab').classList.add('active');
+    $('log-tab').setAttribute('aria-selected', 'true');
+    $('active-tab').classList.remove('active'); $('trash-tab').classList.remove('active');
+    $('active-tab').setAttribute('aria-selected', 'false'); $('trash-tab').setAttribute('aria-selected', 'false');
+    const host = $('audit-list');
+    host.innerHTML = '<p class="muted">Загружаем журнал…</p>';
+    const { data, error } = await db().from('archive_audit_log')
+      .select('id,created_at,actor_id,action,table_name,character_id,character_name,changes')
+      .order('created_at', { ascending: false }).limit(200);
+    if (error) {
+      host.innerHTML = `<p class="form-message">Не удалось загрузить журнал: ${esc(error.message)}. Проверь, что SQL-миграция журнала выполнена.</p>`;
+      return;
+    }
+    host.innerHTML = (data || []).map(entry => {
+      const details = Object.entries(entry.changes || {}).map(([key, pair]) => {
+        const label = auditFieldLabels[key] || key;
+        const before = pair && typeof pair === 'object' && 'old' in pair ? auditValue(pair.old) : '—';
+        const after = pair && typeof pair === 'object' && 'new' in pair ? auditValue(pair.new) : auditValue(pair);
+        return `<li><strong>${esc(label)}:</strong> ${esc(before)} <span aria-hidden="true">→</span> ${esc(after)}</li>`;
+      }).join('');
+      const actor = entry.actor_id ? `Администратор · ${entry.actor_id.slice(0,8)}…` : 'Системное действие';
+      return `<article class="audit-entry"><div class="audit-entry-top"><strong>${esc(auditActionLabels[entry.action] || entry.action)} · ${esc(entry.character_name || 'Персонаж')}</strong><time>${esc(new Date(entry.created_at).toLocaleString('ru-RU'))}</time></div><div class="audit-meta">${esc(auditTableLabels[entry.table_name] || entry.table_name)} · ${esc(actor)}</div>${details ? `<ul>${details}</ul>` : '<p class="audit-no-details">Изменение без отдельных полей.</p>'}</article>`;
+    }).join('') || '<p class="muted">Записей пока нет. Новые действия будут появляться здесь.</p>';
   }
 
   function renderPeriods(kind, rows) {
@@ -260,8 +315,10 @@
   $('new-character').onclick = resetForm;
   $('cancel-edit').onclick = () => { $('editor').hidden = true; };
   $('admin-search').oninput = loadAdminList;
-  $('active-tab').onclick = () => { listMode = 'active'; loadAdminList(); };
-  $('trash-tab').onclick = () => { listMode = 'trash'; loadAdminList(); };
+  $('active-tab').onclick = () => { auditMode = false; listMode = 'active'; loadAdminList(); };
+  $('trash-tab').onclick = () => { auditMode = false; listMode = 'trash'; loadAdminList(); };
+  $('log-tab').onclick = () => { auditMode = true; loadAdminList(); };
+  $('refresh-audit').onclick = loadAuditLog;
   $('add-faction').onclick = () => { factionRows.push({ faction_name: '', start_date: null, end_date: null }); renderPeriods('faction', factionRows); };
   $('add-rank').onclick = () => { rankRows.push({ rank_name: '', start_date: null, end_date: null }); renderPeriods('rank', rankRows); };
   $('add-gallery').onclick = () => { galleryRows.push({ image_url: '', caption: '' }); renderGallery(); };
