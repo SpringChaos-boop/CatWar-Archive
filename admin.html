@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Управление архивом — CatWar Archive</title>
-  <link rel="stylesheet" href="css/style.css?v=8">
+  <link rel="stylesheet" href="css/style.css?v=9">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="js/config.js?v=8"></script>
-  <script defer src="js/admin.js?v=8"></script>
+  <script defer src="js/config.js?v=9"></script>
+  <script defer src="js/admin.js?v=9"></script>
 </head>
 <body>
   <header class="site-header">
@@ -15,7 +15,8 @@
     <nav><a href="./">Открыть каталог</a></nav>
   </header>
   <main class="container admin-container">
-    <section id="login-panel" class="panel login-panel">
+    <section id="auth-loading" class="panel login-panel"><p class="muted">Проверяем доступ к панели управления…</p></section>
+    <section id="login-panel" class="panel login-panel" hidden>
       <p class="eyebrow">ЗАКРЫТЫЙ РАЗДЕЛ</p><h1>Вход администратора</h1>
       <p class="muted">Войти сможет только учётная запись, которой выданы права владельца архива.</p>
       <form id="login-form" class="form-stack">
@@ -41,9 +42,11 @@
         <button id="active-tab" class="admin-tab active" type="button" role="tab" aria-selected="true">Активные записи <span id="active-count">0</span></button>
         <button id="trash-tab" class="admin-tab" type="button" role="tab" aria-selected="false">Корзина <span id="trash-count">0</span></button>
         <button id="log-tab" class="admin-tab" type="button" role="tab" aria-selected="false">Журнал изменений</button>
+        <button id="images-tab" class="admin-tab" type="button" role="tab" aria-selected="false">Изображения</button>
       </div>
       <p id="list-message" class="form-message" role="status"></p>
       <div id="admin-list" class="admin-list"></div>
+      <section id="images-panel" class="images-panel" hidden><div class="audit-heading"><div><h2>Изображения архива</h2><p class="muted">Основные изображения и галерея всех персонажей, включая корзину.</p></div><button id="refresh-images" class="button secondary small" type="button">Обновить</button></div><div class="image-manager-tools"><input id="image-search" type="search" placeholder="Поиск по персонажу или подписи"><select id="image-kind"><option value="all">Все изображения</option><option value="cover">Основные изображения</option><option value="gallery">Галерея</option></select></div><div id="image-manager-list" class="image-manager-list"></div></section>
       <section id="audit-panel" class="audit-panel" hidden><div class="audit-heading"><h2>Журнал изменений</h2><button id="refresh-audit" class="button secondary small" type="button">Обновить</button></div><p class="muted">Последние 200 действий с записями архива.</p><div id="audit-list" class="audit-list"></div></section>
 
       <section id="editor" class="panel editor" hidden>
