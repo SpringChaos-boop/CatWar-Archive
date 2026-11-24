@@ -548,10 +548,59 @@
   }
 
   async function replaceChildren(table, characterId, rows) {
-    const { error: deleteError } = await db().from(table).delete().eq('character_id', characterId);
-    if (deleteError) throw deleteError;
-    if (rows.length) {
-      const { error } = await db().from(table).insert(rows.map(row => ({ ...row, character_id: characterId })));
+    // Сохраняем UUID существующих дочерних записей: полная очистка и повторная
+    // вставка превращали каждое обычное сохранение в DELETE + INSERT в журнале.
+    const { data: existingRows, error: loadError } = await db()
+      .from(table).select('*').eq('character_id', characterId);
+    if (loadError) throw loadError;
+
+    const existing = existingRows || [];
+    const existingById = new Map(existing.map(item => [item.id, item]));
+    const keptIds = new Set();
+    const pendingInserts = [];
+
+    for (let index = 0; index < rows.length; index++) {
+      const source = rows[index];
+      const row = { ...source, character_id: characterId };
+
+      // Для периодов и галереи используем сохранённый UUID.
+      // Для истории имён (textarea) сопоставляем строки по позиции:
+      // изменение имени становится UPDATE, а не удалением и созданием.
+      let existingId = row.id || null;
+      if (!existingId && table === 'character_names') {
+        const match = existing.find(item => Number(item.position) === Number(row.position));
+        if (match) existingId = match.id;
+      }
+
+      delete row.id;
+      if (existingId) {
+        const previous = existingById.get(existingId);
+        const changed = !previous || Object.entries(row).some(([key, value]) => {
+          if (key === 'character_id') return false;
+          const before = previous[key] ?? null;
+          const after = value ?? null;
+          return before !== after;
+        });
+        if (changed) {
+          const { error } = await db().from(table).update(row)
+            .eq('id', existingId).eq('character_id', characterId);
+          if (error) throw error;
+        }
+        keptIds.add(existingId);
+      } else {
+        pendingInserts.push(row);
+      }
+    }
+
+    const removedIds = existing.map(item => item.id).filter(id => !keptIds.has(id));
+    if (removedIds.length) {
+      const { error } = await db().from(table).delete()
+        .eq('character_id', characterId).in('id', removedIds);
+      if (error) throw error;
+    }
+
+    if (pendingInserts.length) {
+      const { error } = await db().from(table).insert(pendingInserts);
       if (error) throw error;
     }
   }
@@ -646,10 +695,10 @@
 
       await replaceChildren('character_names', characterId, names.map((name, position) => ({ name, position })));
       await replaceChildren('faction_periods', characterId, factionRows.map((row, position) => ({
-        faction_name: row.faction_name.trim(), start_date: row.start_date || null, end_date: row.end_date || null, position
+        id: row.id, faction_name: row.faction_name.trim(), start_date: row.start_date || null, end_date: row.end_date || null, position
       })));
       await replaceChildren('rank_periods', characterId, rankRows.map((row, position) => ({
-        rank_name: row.rank_name.trim(), start_date: row.start_date || null, end_date: row.end_date || null, position
+        id: row.id, rank_name: row.rank_name.trim(), start_date: row.start_date || null, end_date: row.end_date || null, position
       })));
 
       const galleryToSave = [];
@@ -661,7 +710,7 @@
           item.image_url = image_url;
           item.file = null;
         }
-        if (image_url) galleryToSave.push({ image_url, caption: (item.caption || '').trim() || null, position });
+        if (image_url) galleryToSave.push({ id: item.id, image_url, caption: (item.caption || '').trim() || null, position });
       }
       await replaceChildren('gallery_items', characterId, galleryToSave);
 
