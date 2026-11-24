@@ -29,6 +29,11 @@
     <section id="dashboard" hidden>
       <div class="admin-heading"><div><p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p><h1>Архив персонажей</h1><p class="muted">Добавление и редактирование записей.</p></div><button id="logout" class="button secondary">Выйти</button></div>
       <div class="admin-actions"><button id="new-character" class="button">＋ Новая запись</button><input id="admin-search" type="search" placeholder="Найти по имени или игровому ID"></div>
+      <div class="admin-tabs" role="tablist" aria-label="Разделы записей">
+        <button id="active-tab" class="admin-tab active" type="button" role="tab" aria-selected="true">Активные записи <span id="active-count">0</span></button>
+        <button id="trash-tab" class="admin-tab" type="button" role="tab" aria-selected="false">Корзина <span id="trash-count">0</span></button>
+      </div>
+      <p id="list-message" class="form-message" role="status"></p>
       <div id="admin-list" class="admin-list"></div>
 
       <section id="editor" class="panel editor" hidden>
