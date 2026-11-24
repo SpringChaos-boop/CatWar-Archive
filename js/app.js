@@ -153,9 +153,11 @@
     if (!c) return;
     const names = (c.names || []).filter(Boolean);
     const faction = latest(c.factions), rank = latest(c.ranks);
-    const gallery = (c.gallery_items || []).slice().sort((a,b) => (a.position ?? 0) - (b.position ?? 0)).map(item =>
-      `<figure class="gallery-figure"><img src="${esc(item.image_url)}" alt="${esc(item.caption || '')}" loading="lazy">${item.caption ? `<figcaption>${esc(item.caption)}</figcaption>` : ''}</figure>`
-    ).join('');
+    const gallery = (c.gallery_items || []).slice().sort((a,b) => (a.position ?? 0) - (b.position ?? 0)).map(item => {
+      const imageUrl = safeHttpUrl(item.image_url);
+      if (!imageUrl) return '';
+      return `<figure class="gallery-figure"><button class="gallery-image-button" type="button" data-image="${esc(imageUrl)}" data-caption="${esc(item.caption || '')}" aria-label="Открыть изображение в полном размере"><img src="${esc(imageUrl)}" alt="${esc(item.caption || 'Изображение из галереи')}" loading="lazy"></button>${item.caption ? `<figcaption>${esc(item.caption)}</figcaption>` : ''}</figure>`;
+    }).join('');
     const profileUrl = safeHttpUrl(c.profile_url);
     $('profile-content').innerHTML = `
       <div class="profile-hero">
@@ -176,6 +178,24 @@
       ${profileUrl ? `<p class="profile-source"><a target="_blank" rel="noopener noreferrer" href="${esc(profileUrl)}">Открыть профиль CatWar ↗</a></p>` : ''}`;
     $('profile-dialog').showModal();
   }
+
+  function openGalleryImage(url, caption) {
+    const dialog = $('image-viewer');
+    if (!dialog || !url) return;
+    $('image-viewer-src').src = url;
+    $('image-viewer-src').alt = caption || 'Изображение из галереи';
+    $('image-viewer-caption').textContent = caption || '';
+    dialog.showModal();
+  }
+
+  $('profile-content').addEventListener('click', event => {
+    const button = event.target.closest('.gallery-image-button');
+    if (button) openGalleryImage(button.dataset.image, button.dataset.caption || '');
+  });
+  $('close-image-viewer').addEventListener('click', () => $('image-viewer').close());
+  $('image-viewer').addEventListener('click', event => {
+    if (event.target.id === 'image-viewer') $('image-viewer').close();
+  });
 
   ['search','faction-filter','rank-filter','year-filter','sort','image-filter'].forEach(id => $(id).addEventListener('input', () => { shown = PAGE_SIZE; render(); }));
   $('reset').addEventListener('click', () => {
