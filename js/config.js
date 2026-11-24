@@ -7,7 +7,7 @@ window.CATWAR_CONFIG = {
 };
 window.catwarSupabase = null;
 if (window.CATWAR_CONFIG.SUPABASE_URL.startsWith("https://") &&
-    !window.CATWAR_CONFIG.SUPABASE_ANON_KEY.startsWith("sb_publishable_m5souCbWl7ZYNh6fdNlxxA_ScvMYUUy")) {
+    !window.CATWAR_CONFIG.SUPABASE_ANON_KEY.startsWith("ВСТАВЬТЕ")) {
   window.catwarSupabase = window.supabase.createClient(
     window.CATWAR_CONFIG.SUPABASE_URL,
     window.CATWAR_CONFIG.SUPABASE_ANON_KEY
