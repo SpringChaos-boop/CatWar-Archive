@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Цифровой архив персонажей CatWar">
   <title>CatWar Archive — архив персонажей</title>
-  <link rel="stylesheet" href="css/style.css?v=9">
+  <link rel="stylesheet" href="css/style.css?v=10">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="js/config.js?v=9"></script>
-  <script defer src="js/app.js?v=9"></script>
+  <script defer src="js/app.js?v=10"></script>
 </head>
 <body>
   <header class="site-header">
@@ -52,8 +52,9 @@
     </section>
     <div class="pagination"><button id="load-more" class="button secondary" hidden>Показать ещё</button></div>
 
-    <section id="timeline" class="timeline-note">
-      <div><p class="eyebrow">ИСТОРИЯ</p><h2>Хронология архива</h2><p>Используй фильтр по году смерти, чтобы просматривать записи за выбранный период.</p></div>
+    <section id="timeline" class="archive-timeline-section">
+      <div class="archive-timeline-heading"><div><p class="eyebrow">ЛЕТОПИСЬ</p><h2>Хронология архива</h2><p>Годы распределены по датам смерти персонажей. Выбери год, чтобы перейти к соответствующим записям.</p></div></div>
+      <div id="archive-timeline" class="archive-timeline" aria-live="polite"><p class="muted">Формируем хронологию…</p></div>
     </section>
   </main>
 
