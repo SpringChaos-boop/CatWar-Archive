@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Управление архивом — CatWar Archive</title>
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=7">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="js/config.js?v=6"></script>
-  <script defer src="js/admin.js?v=6"></script>
+  <script defer src="js/config.js?v=7"></script>
+  <script defer src="js/admin.js?v=7"></script>
 </head>
 <body>
   <header class="site-header">
@@ -28,7 +28,7 @@
 
     <section id="dashboard" hidden>
       <div class="admin-heading"><div><p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p><h1>Архив персонажей</h1><p class="muted">Добавление и редактирование записей.</p></div><button id="logout" class="button secondary">Выйти</button></div>
-      <div class="admin-actions"><button id="new-character" class="button">＋ Новая запись</button><input id="admin-search" type="search" placeholder="Найти по имени или игровому ID"></div>
+      <div class="admin-actions"><button id="new-character" class="button">＋ Новая запись</button><button id="export-backup" class="button secondary" type="button">Скачать резервную копию</button><input id="admin-search" type="search" placeholder="Найти по имени или игровому ID"></div>
       <div class="admin-tabs" role="tablist" aria-label="Разделы записей">
         <button id="active-tab" class="admin-tab active" type="button" role="tab" aria-selected="true">Активные записи <span id="active-count">0</span></button>
         <button id="trash-tab" class="admin-tab" type="button" role="tab" aria-selected="false">Корзина <span id="trash-count">0</span></button>
