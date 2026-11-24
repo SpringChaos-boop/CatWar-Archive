@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Управление архивом — CatWar Archive</title>
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=8">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="js/config.js?v=7"></script>
-  <script defer src="js/admin.js?v=7"></script>
+  <script defer src="js/config.js?v=8"></script>
+  <script defer src="js/admin.js?v=8"></script>
 </head>
 <body>
   <header class="site-header">
@@ -28,7 +28,15 @@
 
     <section id="dashboard" hidden>
       <div class="admin-heading"><div><p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p><h1>Архив персонажей</h1><p class="muted">Добавление и редактирование записей.</p></div><button id="logout" class="button secondary">Выйти</button></div>
-      <div class="admin-actions"><button id="new-character" class="button">＋ Новая запись</button><button id="export-backup" class="button secondary" type="button">Скачать резервную копию</button><input id="admin-search" type="search" placeholder="Найти по имени или игровому ID"></div>
+      <div class="admin-actions"><button id="new-character" class="button">＋ Новая запись</button><button id="export-backup" class="button secondary" type="button">Скачать резервную копию</button><button id="import-backup-toggle" class="button secondary" type="button">Восстановить из копии</button><input id="admin-search" type="search" placeholder="Найти по имени или игровому ID"></div>
+      <section id="backup-restore-panel" class="panel backup-restore-panel" hidden>
+        <div class="editor-title"><div><p class="eyebrow">ВОССТАНОВЛЕНИЕ ДАННЫХ</p><h2>Импорт резервной копии</h2></div><button id="close-import" class="text-button" type="button">Закрыть</button></div>
+        <p class="muted">Выбери JSON-файл, созданный через «Скачать резервную копию». Сначала будет выполнена проверка без изменения данных.</p>
+        <label class="backup-file-label">Файл резервной копии<input id="backup-file" type="file" accept="application/json,.json"></label>
+        <div id="backup-preview" class="backup-preview" aria-live="polite"></div>
+        <div class="backup-restore-actions"><button id="validate-backup" class="button secondary" type="button">Проверить файл</button><button id="restore-backup" class="button" type="button" disabled>Восстановить данные</button></div>
+        <p class="hint">Восстановление добавляет отсутствующих персонажей и обновляет записи с совпадающими внутренними UUID. Остальные записи не удаляются. Изображения должны оставаться доступными в исходном Supabase Storage.</p>
+      </section>
       <div class="admin-tabs" role="tablist" aria-label="Разделы записей">
         <button id="active-tab" class="admin-tab active" type="button" role="tab" aria-selected="true">Активные записи <span id="active-count">0</span></button>
         <button id="trash-tab" class="admin-tab" type="button" role="tab" aria-selected="false">Корзина <span id="trash-count">0</span></button>
