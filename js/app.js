@@ -141,10 +141,11 @@
     const sort = $('sort').value, imageFilter = $('image-filter').value;
     const rows = archiveRows().filter(c => {
       const names = (c.names || []).join(' ');
-      const searchable = [c.game_id || '', c.last_name || '', names, c.death_cause || '', c.biography || '', c.notes || ''].join(' ').toLocaleLowerCase('ru');
+      const factionNames = (c.factions || []).map(period => String(period.faction_name || '').trim()).filter(Boolean);
+      const searchable = [c.game_id || '', c.last_name || '', names, factionNames.join(' '), c.death_cause || '', c.biography || '', c.notes || ''].join(' ').toLocaleLowerCase('ru');
       const hasImage = !!(c.cover_url || (c.gallery_items || []).length);
       return (!query || searchable.includes(query)) &&
-        (!faction || latest(c.factions).faction_name === faction) &&
+        (!faction || factionNames.some(name => name.toLocaleLowerCase('ru') === faction.toLocaleLowerCase('ru'))) &&
         (!rank || (c.ranks || []).some(x => x.rank_name === rank)) &&
         (!year || (year === 'unknown' ? !c.death_date : (c.death_date || '').startsWith(year))) &&
         (!imageFilter || (imageFilter === 'yes' ? hasImage : !hasImage));
