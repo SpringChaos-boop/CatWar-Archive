@@ -54,6 +54,64 @@
     else if (user) $('login-message').textContent = 'У этой учётной записи нет прав администратора.';
   }
 
+  async function loadFeaturedManager() {
+    const select = $('featured-character-select');
+    const message = $('featured-admin-message');
+    if (!select) return;
+    select.disabled = true;
+    message.textContent = 'Загружаем список персонажей…';
+    const [{ data: characters, error: charactersError }, { data: setting, error: settingError }] = await Promise.all([
+      db().from('characters').select('id,last_name,game_id').is('deleted_at', null).order('last_name').limit(2000),
+      db().from('archive_featured_character').select('character_id').eq('slot', true).maybeSingle()
+    ]);
+    if (charactersError || settingError) {
+      select.innerHTML = '<option value="">Не удалось загрузить список</option>';
+      message.textContent = `Не удалось загрузить настройки живой карточки: ${(charactersError || settingError).message}. Проверь, что выполнен SQL-файл featured-character.sql.`;
+      select.disabled = true;
+      return;
+    }
+    const selectedId = setting?.character_id || '';
+    select.innerHTML = '<option value="">— Выбери персонажа —</option>' + (characters || []).map(character =>
+      `<option value="${esc(character.id)}">${esc(character.last_name)}${character.game_id ? ` · ID ${esc(character.game_id)}` : ''}</option>`
+    ).join('');
+    select.value = selectedId;
+    select.disabled = false;
+    message.textContent = selectedId && !select.value
+      ? 'Ранее выбранный персонаж сейчас неактивен или находится в корзине.'
+      : selectedId ? 'Сейчас эта карточка отображается в публичном архиве.' : 'Живая карточка пока не выбрана.';
+  }
+
+  async function saveFeaturedCharacter() {
+    const id = $('featured-character-select').value;
+    if (!id) { $('featured-admin-message').textContent = 'Сначала выбери персонажа из списка.'; return; }
+    const button = $('save-featured-character');
+    button.disabled = true;
+    try {
+      const { error } = await db().from('archive_featured_character').upsert({
+        slot: true, character_id: id, updated_at: new Date().toISOString()
+      }, { onConflict: 'slot' });
+      if (error) throw error;
+      $('featured-admin-message').textContent = 'Карточка сохранена и опубликована в верхней части архива.';
+    } catch (error) {
+      $('featured-admin-message').textContent = `Не удалось сохранить выбор: ${error.message}`;
+    } finally { button.disabled = false; }
+  }
+
+  async function clearFeaturedCharacter() {
+    const button = $('clear-featured-character');
+    button.disabled = true;
+    try {
+      const { error } = await db().from('archive_featured_character').upsert({
+        slot: true, character_id: null, updated_at: new Date().toISOString()
+      }, { onConflict: 'slot' });
+      if (error) throw error;
+      $('featured-character-select').value = '';
+      $('featured-admin-message').textContent = 'Карточка снята с главной страницы архива.';
+    } catch (error) {
+      $('featured-admin-message').textContent = `Не удалось снять карточку: ${error.message}`;
+    } finally { button.disabled = false; }
+  }
+
   async function loadAdminList() {
     if (auditMode) { $('admin-list').hidden = true; $('audit-panel').hidden = true; $('images-panel').hidden = true; await loadAuditLog(); return; }
     $('audit-panel').hidden = true; $('images-panel').hidden = true;
@@ -62,6 +120,7 @@
       .select('id,game_id,last_name,deleted_at').order('last_name').limit(1000);
     if (error) { $('admin-list').textContent = error.message; return; }
 
+    if (listMode === 'active') await loadFeaturedManager();
     const allRows = data || [];
     const activeRows = allRows.filter(c => !c.deleted_at);
     const trashRows = allRows.filter(c => !!c.deleted_at);
@@ -615,6 +674,8 @@
   };
   $('logout').onclick = async () => { await db().auth.signOut(); location.reload(); };
   $('new-character').onclick = resetForm;
+  $('save-featured-character').onclick = saveFeaturedCharacter;
+  $('clear-featured-character').onclick = clearFeaturedCharacter;
   $('export-backup').onclick = exportBackup;
   $('import-backup-toggle').onclick = () => { $('backup-restore-panel').hidden = false; $('backup-restore-panel').scrollIntoView({ behavior: 'smooth' }); };
   $('close-import').onclick = () => { $('backup-restore-panel').hidden = true; };
