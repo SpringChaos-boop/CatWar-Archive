@@ -125,3 +125,55 @@
 .image-viewer>p{margin:12px 0 0;text-align:center;color:var(--muted);font-size:12px}
 .image-viewer-close{position:sticky;top:0;float:right;margin:-30px -7px 5px 0;border:0;border-radius:50%;width:34px;height:34px;background:#34424c;color:#fff;font-size:24px;line-height:1;cursor:pointer;z-index:2}
 @media(max-width:600px){.theme-toggle{padding:8px 10px}.image-viewer{padding:40px 10px 12px}.image-viewer>img{max-height:calc(100vh - 105px)}}
+
+/* Улучшенная читаемость интерфейса без изменения размеров заголовков */
+body{font-size:16px}
+.site-header nav{font-size:14px}
+.eyebrow{font-size:12px}
+.lead{font-size:16px}
+.stats span,.results-line,.site-footer{font-size:13px}
+.text-button{font-size:14px}
+.filters select,.filters input,.search input{font-size:15px}
+.character-row{transition:none}
+.character-name{font-size:15px}
+.subline{font-size:12px}
+.tag{font-size:12px}
+.dates{font-size:13px}
+.button{font-size:14px}
+.profile-section p{font-size:14px}
+.profile-section .biography-text,.profile-section .notes-text{font-size:14px}
+.gallery-figure figcaption{font-size:12px}
+.form-stack label{font-size:14px}
+.hint{font-size:12px}
+.form-message{font-size:13px}
+.period-top{font-size:14px}
+.period-card label,.gallery-card label{font-size:12px}
+.audit-entry-top strong{font-size:14px}
+.audit-entry time,.audit-meta,.audit-no-details{font-size:12px}
+.audit-entry ul{font-size:13px;line-height:1.75}
+.admin-tab{font-size:14px}
+.admin-tab span{font-size:12px}
+.managed-image-info strong{font-size:14px}
+.managed-image-info span,.managed-image-info small,.managed-image-info a{font-size:12px}
+.profile-game-id{font-size:13px}
+.profile-life-dates span,.section-heading>span{font-size:12px}
+.profile-life-dates strong{font-size:13px}
+.profile-dialog .profile-section h3{font-size:15px}
+.name-history-number,.life-event-index{font-size:12px}
+.name-history-value{font-size:14px}
+.name-current{font-size:11px}
+.life-event-card strong{font-size:14px}
+.life-event-dates{font-size:12px}
+.profile-dialog .notes-text{font-size:14px}
+.profile-source{font-size:13px}
+.archive-timeline-heading p:last-child{font-size:14px}
+.archive-year-count{font-size:12px}
+.timeline-person{font-size:12px}
+.timeline-more{font-size:12px}
+
+/* Контраст журнала изменений в тёмной теме */
+:root[data-theme="dark"] .audit-entry ul{color:#c0cbd2}
+:root[data-theme="dark"] .audit-entry li strong{color:#e4e9ed}
+:root[data-theme="dark"] .audit-entry time,
+:root[data-theme="dark"] .audit-meta,
+:root[data-theme="dark"] .audit-no-details{color:var(--muted)}
