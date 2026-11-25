@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Управление архивом — CatWar Archive</title>
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/style.css?v=12">
   <script>
     (() => { try { const saved = localStorage.getItem('catwar-archive-theme'); if (saved === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (_) {} })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="js/config.js?v=9"></script>
-  <script defer src="js/admin.js?v=9"></script>
+  <script defer src="js/admin.js?v=12"></script>
 </head>
 <body>
   <header class="site-header">
@@ -40,6 +40,20 @@
         <div id="backup-preview" class="backup-preview" aria-live="polite"></div>
         <div class="backup-restore-actions"><button id="validate-backup" class="button secondary" type="button">Проверить файл</button><button id="restore-backup" class="button" type="button" disabled>Восстановить данные</button></div>
         <p class="hint">Восстановление добавляет отсутствующих персонажей и обновляет записи с совпадающими внутренними UUID. Остальные записи не удаляются. Изображения должны оставаться доступными в исходном Supabase Storage.</p>
+      </section>
+      <section class="panel featured-admin-panel" aria-labelledby="featured-admin-title">
+        <div class="editor-title"><div><p class="eyebrow">ГЛАВНАЯ КАРТОЧКА АРХИВА</p><h2 id="featured-admin-title">Живая история</h2></div></div>
+        <p class="muted">Выбери существующую карточку персонажа, чья история ещё продолжается. Она появится отдельным заметным блоком под поиском в публичном архиве.</p>
+        <div class="featured-admin-controls">
+          <label for="featured-character-select">Персонаж
+            <select id="featured-character-select"><option value="">Загрузка списка…</option></select>
+          </label>
+          <div class="featured-admin-buttons">
+            <button id="save-featured-character" class="button" type="button">Показать в архиве</button>
+            <button id="clear-featured-character" class="button secondary" type="button">Снять карточку</button>
+          </div>
+        </div>
+        <p id="featured-admin-message" class="form-message" role="status"></p>
       </section>
       <div class="admin-tabs" role="tablist" aria-label="Разделы записей">
         <button id="active-tab" class="admin-tab active" type="button" role="tab" aria-selected="true">Активные записи <span id="active-count">0</span></button>
