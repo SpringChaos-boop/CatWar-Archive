@@ -1,7 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const PAGE_SIZE = 40;
-  let all = [], shown = PAGE_SIZE;
+  let all = [], shown = PAGE_SIZE, featuredId = null, featuredCharacter = null;
 
   const demo = [
     {id:'demo-1',game_id:'1382656',last_name:'Лапка',birth_date:'2017-07-02',death_date:'2017-08-08',death_cause:'Жажда',biography:'',cover_url:'',factions:[{faction_name:'Морское племя',position:0}],ranks:[{rank_name:'Оруженосец',position:0}],names:['Доброусочка','Лапка']},
@@ -40,36 +40,80 @@
         factions: orderedPeriods(character.faction_periods),
         ranks: orderedPeriods(character.rank_periods)
       }));
+      const { data: featuredSetting, error: featuredError } = await window.catwarSupabase
+        .from('archive_featured_character').select('character_id').eq('slot', true).maybeSingle();
+      if (featuredError) {
+        console.error('Не удалось загрузить выбранную живую карточку:', featuredError.message);
+        featuredId = null;
+      } else {
+        featuredId = featuredSetting?.character_id || null;
+      }
+      featuredCharacter = all.find(character => String(character.id) === String(featuredId)) || null;
     } else {
       all = demo;
       $('result-count').textContent = 'Демонстрационные данные — подключите Supabase для публикации';
     }
+    renderFeaturedCharacter();
     populateFilters();
     updateStats();
     renderArchiveTimeline();
     render();
   }
 
+  function archiveRows() {
+    return featuredCharacter ? all.filter(character => String(character.id) !== String(featuredCharacter.id)) : all;
+  }
+
+  function renderFeaturedCharacter() {
+    const host = $('featured-character');
+    if (!host) return;
+    if (!featuredCharacter) { host.hidden = true; host.innerHTML = ''; return; }
+    const c = featuredCharacter;
+    const faction = latest(c.factions), rank = latest(c.ranks);
+    const image = safeHttpUrl(c.cover_url);
+    const description = String(c.biography || '').trim();
+    const previous = Math.max(0, (c.names || []).length - 1);
+    host.hidden = false;
+    host.innerHTML = `<article class="featured-card" tabindex="0" role="button" data-id="${esc(c.id)}" aria-label="Открыть профиль персонажа ${esc(c.last_name)}">
+      <div class="featured-card-portrait">${image ? `<img src="${esc(image)}" alt="">` : '<span>✦</span>'}</div>
+      <div class="featured-card-content">
+        <span class="featured-card-kicker"><span class="featured-live-dot"></span> ЖИВАЯ ИСТОРИЯ</span>
+        <h2>${esc(c.last_name || 'Без имени')}</h2>
+        <p class="featured-card-description">${esc(description ? (description.length > 210 ? description.slice(0,207).trimEnd() + '…' : description) : 'История этого персонажа ещё продолжается.')}</p>
+        <div class="featured-card-tags"><span class="tag">${esc(faction.faction_name || 'Фракция не указана')}</span><span class="tag rank">${esc(rank.rank_name || 'Должность не указана')}</span></div>
+        <div class="featured-card-meta">${c.game_id ? `Игровой ID: ${esc(c.game_id)}` : 'Игровой ID не указан'}${previous ? ` · ещё ${previous} ${previous === 1 ? 'имя' : 'имени'}` : ''}</div>
+      </div>
+      <span class="featured-card-arrow" aria-hidden="true">↗</span>
+    </article>`;
+    const card = host.querySelector('.featured-card');
+    card.addEventListener('click', () => openProfile(c.id));
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openProfile(c.id); }
+    });
+  }
+
   function populateFilters() {
-    const factions = [...new Set(all.flatMap(c => (c.factions || []).map(x => x.faction_name)).filter(Boolean))].sort();
-    const ranks = [...new Set(all.flatMap(c => (c.ranks || []).map(x => x.rank_name)).filter(Boolean))].sort();
+    const rows = archiveRows();
+    const factions = [...new Set(rows.flatMap(c => (c.factions || []).map(x => x.faction_name)).filter(Boolean))].sort();
+    const ranks = [...new Set(rows.flatMap(c => (c.ranks || []).map(x => x.rank_name)).filter(Boolean))].sort();
     $('faction-filter').innerHTML = '<option value="">Все фракции</option>' + factions.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
     $('rank-filter').innerHTML = '<option value="">Все должности</option>' + ranks.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
-    const years = [...new Set(all.map(c => c.death_date?.slice(0,4)).filter(Boolean))].sort().reverse();
-    const hasUnknownYear = all.some(c => !c.death_date);
+    const years = [...new Set(rows.map(c => c.death_date?.slice(0,4)).filter(Boolean))].sort().reverse();
+    const hasUnknownYear = rows.some(c => !c.death_date);
     $('year-filter').innerHTML = '<option value="">Любой год смерти</option>' + years.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('') + (hasUnknownYear ? '<option value="unknown">Год смерти неизвестен</option>' : '');
   }
 
   function updateStats() {
-    $('stat-total').textContent = all.length.toLocaleString('ru-RU');
-    $('stat-factions').textContent = new Set(all.map(c => latest(c.factions).faction_name).filter(Boolean)).size;
-    const years = all.map(c => Number((c.birth_date || c.death_date || '').slice(0,4))).filter(Boolean);
+    const rows = archiveRows();
+    $('stat-total').textContent = rows.length.toLocaleString('ru-RU');
+    $('stat-factions').textContent = new Set(rows.map(c => latest(c.factions).faction_name).filter(Boolean)).size;
+    const years = rows.map(c => Number((c.birth_date || c.death_date || '').slice(0,4))).filter(Boolean);
     $('stat-years').textContent = years.length ? new Date().getFullYear() - Math.min(...years) + 1 : '—';
   }
 
   function renderArchiveTimeline() {
     const groups = new Map();
-    all.forEach(character => {
+    archiveRows().forEach(character => {
       const year = character.death_date ? String(character.death_date).slice(0,4) : 'unknown';
       if (!groups.has(year)) groups.set(year, []);
       groups.get(year).push(character);
@@ -95,7 +139,7 @@
     const query = $('search').value.trim().toLocaleLowerCase('ru');
     const faction = $('faction-filter').value, rank = $('rank-filter').value, year = $('year-filter').value;
     const sort = $('sort').value, imageFilter = $('image-filter').value;
-    const rows = all.filter(c => {
+    const rows = archiveRows().filter(c => {
       const names = (c.names || []).join(' ');
       const searchable = [c.game_id || '', c.last_name || '', names, c.death_cause || '', c.biography || '', c.notes || ''].join(' ').toLocaleLowerCase('ru');
       const hasImage = !!(c.cover_url || (c.gallery_items || []).length);
@@ -152,6 +196,7 @@
     const c = all.find(x => String(x.id) === String(id));
     if (!c) return;
     const names = (c.names || []).filter(Boolean);
+    const isFeatured = featuredCharacter && String(c.id) === String(featuredCharacter.id);
     const faction = latest(c.factions), rank = latest(c.ranks);
     const gallery = (c.gallery_items || []).slice().sort((a,b) => (a.position ?? 0) - (b.position ?? 0)).map(item => {
       const imageUrl = safeHttpUrl(item.image_url);
@@ -162,9 +207,9 @@
     $('profile-content').innerHTML = `
       <div class="profile-hero">
         <div class="profile-portrait">${c.cover_url ? `<img src="${esc(c.cover_url)}" alt="Основное изображение персонажа">` : '<span>✦</span>'}</div>
-        <div class="profile-identity"><p class="eyebrow">АРХИВНАЯ ЗАПИСЬ</p><h2>${esc(c.last_name || 'Без имени')}</h2><p class="profile-game-id">Игровой ID: ${esc(c.game_id || 'не указан')}</p>
+        <div class="profile-identity"><p class="eyebrow">${isFeatured ? 'ИСТОРИЯ ПРОДОЛЖАЕТСЯ' : 'АРХИВНАЯ ЗАПИСЬ'}</p><h2>${esc(c.last_name || 'Без имени')}</h2><p class="profile-game-id">Игровой ID: ${esc(c.game_id || 'не указан')}</p>
           <div class="profile-tags"><span class="tag">${esc(faction.faction_name || 'Фракция не указана')}</span><span class="tag rank">${esc(rank.rank_name || 'Должность не указана')}</span></div>
-          <div class="profile-life-dates"><div><span>Рождение</span><strong>${esc(fmt(c.birth_date))}</strong></div><div><span>Смерть</span><strong>${esc(fmt(c.death_date))}</strong></div></div>
+          <div class="profile-life-dates"><div><span>Рождение</span><strong>${esc(fmt(c.birth_date))}</strong></div><div><span>${isFeatured ? 'Статус' : 'Смерть'}</span><strong>${isFeatured ? 'Живой персонаж' : esc(fmt(c.death_date))}</strong></div></div>
         </div>
       </div>
       ${c.biography ? `<section class="profile-section biography-section"><h3>Биография</h3><p class="biography-text">${esc(c.biography).replace(/\n/g, '<br>')}</p></section>` : ''}
@@ -173,7 +218,7 @@
       </section>
       ${renderPeriodTimeline('История фракций', c.factions, 'faction_name', 'faction-timeline')}
       ${renderPeriodTimeline('История должностей', c.ranks, 'rank_name', 'rank-timeline')}
-      <section class="profile-section"><h3>Обстоятельства смерти</h3><p>${esc(c.death_cause || 'Причина смерти не указана')}</p>${c.notes ? `<div class="notes-text">${esc(c.notes).replace(/\n/g, '<br>')}</div>` : ''}</section>
+      ${isFeatured ? (c.notes ? `<section class="profile-section"><h3>Заметки</h3><div class="notes-text">${esc(c.notes).replace(/\n/g, '<br>')}</div></section>` : '') : `<section class="profile-section"><h3>Обстоятельства смерти</h3><p>${esc(c.death_cause || 'Причина смерти не указана')}</p>${c.notes ? `<div class="notes-text">${esc(c.notes).replace(/\n/g, '<br>')}</div>` : ''}</section>`}
       <section class="profile-section"><div class="section-heading"><h3>Галерея</h3><span>${(c.gallery_items || []).length} изображений</span></div><div class="profile-gallery">${gallery || '<p class="muted">Галерея пока пуста</p>'}</div></section>
       ${profileUrl ? `<p class="profile-source"><a target="_blank" rel="noopener noreferrer" href="${esc(profileUrl)}">Открыть профиль CatWar ↗</a></p>` : ''}`;
     $('profile-dialog').showModal();
