@@ -177,3 +177,32 @@ body{font-size:16px}
 :root[data-theme="dark"] .audit-entry time,
 :root[data-theme="dark"] .audit-meta,
 :root[data-theme="dark"] .audit-no-details{color:var(--muted)}
+
+
+/* Выделенная карточка персонажа, чья история продолжается */
+.featured-character-section{margin:20px 0 22px}
+.featured-card{position:relative;display:grid;grid-template-columns:190px minmax(0,1fr) 28px;gap:24px;align-items:center;width:100%;padding:18px 22px;border:1px solid #c9d7dc;border-radius:18px;background:linear-gradient(115deg,#e8f0f1 0%,#f8f7f1 58%,#f2eee5 100%);color:var(--ink);text-align:left;cursor:pointer;overflow:hidden;box-shadow:0 8px 24px #29323b12;transition:transform .16s ease,box-shadow .16s ease}
+.featured-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px #29323b20}
+.featured-card-portrait{width:190px;height:170px;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:#dbe5e8;color:#718895;font-size:42px}
+.featured-card-portrait img{width:100%;height:100%;object-fit:cover}
+.featured-card-content{min-width:0}
+.featured-card-kicker{display:inline-flex;align-items:center;gap:8px;color:#54717c;font-size:11px;font-weight:800;letter-spacing:.13em}
+.featured-live-dot{width:8px;height:8px;border-radius:50%;background:#4e9b78;box-shadow:0 0 0 4px #4e9b7820}
+.featured-card h2{margin:9px 0 7px;font-size:25px;color:#263b45}
+.featured-card-description{max-width:680px;margin:0 0 13px;color:#5c6d75;font-size:14px;line-height:1.6}
+.featured-card-tags{display:flex;gap:7px;flex-wrap:wrap}
+.featured-card-meta{margin-top:11px;color:#71808a;font-size:12px}
+.featured-card-arrow{align-self:center;color:#66818d;font-size:25px}
+.featured-admin-panel{margin:18px 0}
+.featured-admin-panel h2{margin:0;font-size:20px}
+.featured-admin-controls{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:14px;align-items:end;margin-top:14px}
+.featured-admin-controls label{display:grid;gap:7px;font-size:13px;font-weight:600}
+.featured-admin-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.featured-admin-panel .form-message{margin:10px 0 0}
+:root[data-theme="dark"] .featured-card{background:linear-gradient(115deg,#293b44 0%,#30383b 58%,#3a3932 100%);border-color:#4b626d;box-shadow:0 8px 24px #0003;color:var(--ink)}
+:root[data-theme="dark"] .featured-card h2{color:#e7edf0}
+:root[data-theme="dark"] .featured-card-kicker{color:#b3cbd3}
+:root[data-theme="dark"] .featured-card-description{color:#c0cbd2}
+:root[data-theme="dark"] .featured-card-meta,:root[data-theme="dark"] .featured-card-arrow{color:#aabac2}
+:root[data-theme="dark"] .featured-card-portrait{background:#344650;color:#c1d0d7}
+@media(max-width:650px){.featured-card{grid-template-columns:92px minmax(0,1fr) 16px;gap:13px;padding:13px}.featured-card-portrait{width:92px;height:112px}.featured-card h2{font-size:19px}.featured-card-description{font-size:13px}.featured-card-arrow{font-size:20px}.featured-admin-controls{grid-template-columns:1fr}.featured-admin-buttons>*{flex:1}}
